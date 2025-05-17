@@ -1,34 +1,32 @@
 const express = require('express');
+const { Low, JSONFile } = require('lowdb');
 const app = express();
-const port = 3000;
-const fs = require('fs');
-const low = require('lowdb');
-const FileSync = require('lowdb/adapters/FileSync');
-const adapter = new FileSync('db.json');
-const db = low(adapter);
+const port = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Initialize data structure
-db.defaults({ recharges: [] }).write();
+// LowDB সেটআপ
+const adapter = new JSONFile('db.json');
+const db = new Low(adapter);
+await db.read();
+db.data ||= { recharges: [] };
 
-// POST endpoint to create recharge
-app.post('/recharge', (req, res) => {
+// রিচার্জ যোগ করার API
+app.post('/recharge', async (req, res) => {
     const { number, amount } = req.body;
     if (!number || !amount) {
-        return res.status(400).json({ error: 'Missing number or amount' });
+        return res.status(400).json({ message: 'Invalid input' });
     }
-    const recharge = { id: Date.now(), number, amount };
-    db.get('recharges').push(recharge).write();
-    res.json({ success: true, recharge });
+    db.data.recharges.push({ number, amount, date: new Date().toISOString() });
+    await db.write();
+    res.status(201).json({ message: 'Recharge added successfully' });
 });
 
-// GET endpoint to list recharges
-app.get('/recharges', (req, res) => {
-    const recharges = db.get('recharges').value();
-    res.json(recharges);
+// সব রিচার্জ লিস্ট দেখার API
+app.get('/recharges', async (req, res) => {
+    res.json(db.data.recharges);
 });
 
 app.listen(port, () => {
-    console.log(`Server is running at http://localhost:${port}`);
+    console.log(`Server is running on port ${port}`);
 });
